@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: daily_sales
+    columns:
+      - name: sales_date
+        tests:
+          - not_null
+          - unique
+      - name: order_count
+        tests:
+          - not_null
+      - name: gross_sales
+        tests:
+          - not_null
+      - name: refund_count
+        tests:
+          - not_null
+      - name: refund_amount
+        tests:
+          - not_null
+      - name: net_sales
+        tests:
+          - not_null
+      - name: average_order_amount
+        tests:
+          - not_null

@@ -1,0 +1,97 @@
+version: 2
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+      - name: email
+        tests:
+          - not_null
+          - unique
+      - name: customer_grade
+        tests:
+          - accepted_values:
+              values: ["bronze", "silver", "gold", "vip"]
+
+  - name: stg_products
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+      - name: price
+        tests:
+          - not_null
+      - name: cost
+        tests:
+          - not_null
+
+  - name: stg_orders
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_status
+        tests:
+          - accepted_values:
+              values: ["completed", "partially_refunded", "refunded"]
+      - name: payment_method
+        tests:
+          - accepted_values:
+              values: ["card", "kakao_pay", "naver_pay", "bank_transfer"]
+
+  - name: stg_order_items
+    columns:
+      - name: order_item_id
+        tests:
+          - not_null
+          - unique
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+      - name: quantity
+        tests:
+          - not_null
+
+  - name: stg_refunds
+    columns:
+      - name: refund_id
+        tests:
+          - not_null
+          - unique
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: order_item_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('stg_order_items')
+              field: order_item_id
+      - name: refund_reason
+        tests:
+          - accepted_values:
+              values: ["size_issue", "defective", "change_of_mind", "delayed_delivery", "wrong_item"]

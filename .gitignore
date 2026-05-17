@@ -1,0 +1,10 @@
+data/source/*.csv
+data/warehouse/raw/*.csv
+
+dbt/.user.yml
+dbt/logs/
+dbt/target/
+
+__pycache__/
+*.pyc
+.DS_Store

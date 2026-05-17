@@ -1,0 +1,138 @@
+services:
+  source-db:
+    image: postgres:16
+    container_name: ecommerce-source-db
+    environment:
+      POSTGRES_USER: source_user
+      POSTGRES_PASSWORD: source_password
+      POSTGRES_DB: ecommerce_source
+    ports:
+      - "5433:5432"
+    volumes:
+      - source-db-data:/var/lib/postgresql/data
+      - ./docker/source-db/init:/docker-entrypoint-initdb.d
+      - ./data/source:/data/source:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U source_user -d ecommerce_source"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  warehouse-db:
+    image: postgres:16
+    container_name: ecommerce-warehouse-db
+    environment:
+      POSTGRES_USER: warehouse_user
+      POSTGRES_PASSWORD: warehouse_password
+      POSTGRES_DB: ecommerce_warehouse
+    ports:
+      - "5434:5432"
+    volumes:
+      - warehouse-db-data:/var/lib/postgresql/data
+      - ./docker/warehouse-db/init:/docker-entrypoint-initdb.d
+      - ./data/warehouse/raw:/data/warehouse/raw:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_user -d ecommerce_warehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow-db:
+    image: postgres:16
+    container_name: ecommerce-airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow-init:
+    build:
+      context: .
+      dockerfile: docker/airflow/Dockerfile
+    image: ecommerce-airflow:latest
+    container_name: ecommerce-airflow-init
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    environment: &airflow-common-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: ecommerce_batch_pipeline
+      SOURCE_DB_HOST: source-db
+      SOURCE_DB_PORT: "5432"
+      SOURCE_DB_USER: source_user
+      SOURCE_DB_PASSWORD: source_password
+      SOURCE_DB_NAME: ecommerce_source
+      WAREHOUSE_DB_HOST: warehouse-db
+      WAREHOUSE_DB_PORT: "5432"
+      WAREHOUSE_DB_USER: warehouse_user
+      WAREHOUSE_DB_PASSWORD: warehouse_password
+      WAREHOUSE_DB_NAME: ecommerce_warehouse
+      DBT_WAREHOUSE_HOST: warehouse-db
+      DBT_WAREHOUSE_PORT: "5432"
+      DBT_WAREHOUSE_USER: warehouse_user
+      DBT_WAREHOUSE_PASSWORD: warehouse_password
+      DBT_WAREHOUSE_DB: ecommerce_warehouse
+    volumes: &airflow-common-volumes
+      - ./airflow/dags:/opt/airflow/dags
+      - .:/opt/airflow/project
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username airflow \
+          --password airflow \
+          --firstname Airflow \
+          --lastname Admin \
+          --role Admin \
+          --email airflow@example.com
+
+  airflow-webserver:
+    image: ecommerce-airflow:latest
+    container_name: ecommerce-airflow-webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      source-db:
+        condition: service_healthy
+      warehouse-db:
+        condition: service_healthy
+    environment: *airflow-common-env
+    volumes: *airflow-common-volumes
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  airflow-scheduler:
+    image: ecommerce-airflow:latest
+    container_name: ecommerce-airflow-scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      source-db:
+        condition: service_healthy
+      warehouse-db:
+        condition: service_healthy
+    environment: *airflow-common-env
+    volumes: *airflow-common-volumes
+    command: scheduler
+
+volumes:
+  source-db-data:
+  warehouse-db-data:
+  airflow-db-data:

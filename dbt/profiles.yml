@@ -1,0 +1,12 @@
+ecommerce_batch_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_WAREHOUSE_HOST', 'localhost') }}"
+      user: "{{ env_var('DBT_WAREHOUSE_USER', 'warehouse_user') }}"
+      password: "{{ env_var('DBT_WAREHOUSE_PASSWORD', 'warehouse_password') }}"
+      port: "{{ env_var('DBT_WAREHOUSE_PORT', '5434') | int }}"
+      dbname: "{{ env_var('DBT_WAREHOUSE_DB', 'ecommerce_warehouse') }}"
+      schema: marts
+      threads: 4
