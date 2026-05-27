@@ -12,7 +12,7 @@ DBT_DIR = f"{PROJECT_DIR}/dbt"
 DEFAULT_ARGS = {
     "owner": "data-engineering",
     "depends_on_past": False,
-    "retries": 1,
+    "retries": 2,
     "retry_delay": timedelta(minutes=3),
 }
 
@@ -31,36 +31,42 @@ with DAG(
     load_source_data = BashOperator(
         task_id="load_source_data",
         bash_command=f"cd {PROJECT_DIR} && python scripts/airflow_load_source_data.py",
+        execution_timeout=timedelta(minutes=10),
     )
 
-    full_load_source_to_raw = BashOperator(
-        task_id="full_load_source_to_raw",
-        bash_command=f"cd {PROJECT_DIR} && python scripts/airflow_full_load_source_to_raw.py",
+    incremental_load_source_to_raw = BashOperator(
+        task_id="incremental_load_source_to_raw",
+        bash_command=f"cd {PROJECT_DIR} && python scripts/airflow_incremental_load_source_to_raw.py",
+        execution_timeout=timedelta(minutes=10),
     )
 
     dbt_run_staging = BashOperator(
         task_id="dbt_run_staging",
         bash_command=f"cd {DBT_DIR} && dbt run --select staging --profiles-dir .",
+        execution_timeout=timedelta(minutes=10),
     )
 
     dbt_test_staging = BashOperator(
         task_id="dbt_test_staging",
         bash_command=f"cd {DBT_DIR} && dbt test --select staging --profiles-dir .",
+        execution_timeout=timedelta(minutes=10),
     )
 
     dbt_run_marts = BashOperator(
         task_id="dbt_run_marts",
         bash_command=f"cd {DBT_DIR} && dbt run --select marts --profiles-dir .",
+        execution_timeout=timedelta(minutes=10),
     )
 
     dbt_test_marts = BashOperator(
         task_id="dbt_test_marts",
         bash_command=f"cd {DBT_DIR} && dbt test --select marts --profiles-dir .",
+        execution_timeout=timedelta(minutes=10),
     )
 
     (
         load_source_data
-        >> full_load_source_to_raw
+        >> incremental_load_source_to_raw
         >> dbt_run_staging
         >> dbt_test_staging
         >> dbt_run_marts
